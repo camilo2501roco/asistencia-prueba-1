@@ -1,26 +1,29 @@
 <template>
   <div class="q-pa-md flex flex-center column">
-    <h3>Tomar Asistencia</h3>
+    <h3>Tomar Asistencia (Facial)</h3>
     
-    <div class="column items-center q-gutter-y-lg">
-      <q-icon name="fingerprint" size="100px" color="primary" class="cursor-pointer" @click="takeAttendance_Manual"/>
+    <div class="column items-center q-gutter-y-lg" style="width: 100%; max-width: 500px">
       
-      <div class="text-h6 text-grey">Toca el icono para escanear</div>
+      <div class="relative-position" style="width: 100%; height: 350px; background: #000; border-radius: 8px; overflow: hidden;">
+        <video ref="video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+        
+        <div v-if="!modelsLoaded" class="absolute-full flex flex-center bg-dark text-white" style="opacity: 0.8">
+            <q-spinner size="3em" />
+            <div class="q-ml-sm">Cargando Modelos...</div>
+        </div>
+
+        <div v-if="scanning" class="absolute-bottom text-center text-white bg-primary q-py-xs" style="opacity: 0.8">
+           Escaneando...
+        </div>
+      </div>
       
-      <q-btn 
-        color="secondary" 
-        size="lg"
-        label="Registrar Entrada/Salida" 
-        @click="takeAttendance" 
-        :loading="loading"
-        class="q-mt-md"
-      />
+      <div class="text-h6 text-grey" v-if="!lastLog">Mira a la cámara para registrarte</div>
     </div>
 
     <!-- Last Log Display -->
-    <q-card v-if="lastLog" class="q-mt-xl bg-grey-2" style="width: 100%; max-width: 400px">
+    <q-card v-if="lastLog" class="q-mt-xl bg-green-1 fade-in-out" style="width: 100%; max-width: 400px">
       <q-card-section>
-        <div class="text-h6">Último Registro</div>
+        <div class="text-h6 text-green-9">¡Bienvenido!</div>
         <div class="text-subtitle1">{{ lastLog.userName }}</div>
         <div class="text-caption">{{ new Date(lastLog.timestamp).toLocaleString() }}</div>
         <q-chip :color="lastLog.type === 'ENTRADA' ? 'green' : 'orange'" text-color="white">
@@ -32,73 +35,133 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useQuasar } from 'quasar'
 import { StorageService } from '../services/StorageService'
-import { bufferToBase64URL } from '../utils/webauthn'
+import * as faceapi from 'face-api.js'
 
 const $q = useQuasar()
-const loading = ref(false)
 const lastLog = ref(null)
+const modelsLoaded = ref(false)
+const video = ref(null)
+const scanning = ref(false)
+let stream = null
+let intervalId = null
+let isProcessing = false
 
-async function takeAttendance() {
-  loading.value = true
+onMounted(async () => {
+  await loadModels()
+  startCamera()
+})
+
+onBeforeUnmount(() => {
+  stopCamera()
+})
+
+async function loadModels() {
   try {
-    const challenge = new Uint8Array(32);
-    window.crypto.getRandomValues(challenge);
-
-    const publicKeyCredentialRequestOptions = {
-        challenge: challenge,
-        rpId: window.location.hostname,
-        userVerification: "required",
-    };
-
-    const assertion = await navigator.credentials.get({
-        publicKey: publicKeyCredentialRequestOptions
-    });
-    
-    const credentialId = bufferToBase64URL(assertion.rawId);
-    
-    // Find user
-    const user = StorageService.findUserByCredentialId(credentialId);
-    
-    if (user) {
-       // Log attendance
-       const log = {
-         userName: user.name,
-         userId: user.id,
-         timestamp: new Date().toISOString(),
-         type: 'ENTRADA' // Simplified logic, could toggle based on last log
-       }
-       
-       StorageService.saveLog(log)
-       lastLog.value = log
-       
-       $q.notify({
-         color: 'positive',
-         message: `Bienvenido, ${user.name}!`,
-         icon: 'verified',
-         position: 'center',
-         timeout: 2000
-       })
-    } else {
-       throw new Error("Usuario no encontrado")
-    }
-
+    const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models'
+    await Promise.all([
+      faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+    ])
+    modelsLoaded.value = true
   } catch (err) {
-    console.error(err)
-    $q.notify({
-      color: 'negative',
-      message: 'No se reconoció la huella o error de lectura.',
-      icon: 'error'
-    })
-  } finally {
-    loading.value = false
+    console.error("Error loading models", err)
+    $q.notify({ type: 'negative', message: 'Error cargando modelos de IA' })
   }
 }
 
-// Just an alias for the icon click
-function takeAttendance_Manual() {
-  takeAttendance()
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+    if (video.value) {
+      video.value.srcObject = stream
+      // Start detection loop once video is playing
+      video.value.onloadedmetadata = () => {
+          video.value.play()
+          startDetection()
+      }
+    }
+  } catch (err) {
+    console.error("Error starting camera", err)
+    $q.notify({ type: 'negative', message: 'No se pudo acceder a la cámara' })
+  }
+}
+
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop())
+  }
+  if (intervalId) {
+    clearInterval(intervalId)
+  }
+}
+
+function startDetection() {
+    scanning.value = true
+    intervalId = setInterval(async () => {
+        if (!video.value || isProcessing || !modelsLoaded.value) return
+        
+        isProcessing = true
+        try {
+             // Use tinyFaceDetector for faster performance if needed, but SSD is more accurate
+             const detection = await faceapi.detectSingleFace(video.value).withFaceLandmarks().withFaceDescriptor()
+             
+             if (detection) {
+                 const bestMatch = StorageService.findUserByFace(Array.from(detection.descriptor))
+                 
+                 if (bestMatch) {
+                     handleMatch(bestMatch)
+                 } else {
+                     // Detected but not recognized
+                     // Optional: Could show a "Rostro no reconocido" toast but it might spam
+                 }
+             }
+        } catch (e) {
+            console.error(e)
+        } finally {
+            isProcessing = false
+        }
+    }, 500) // Increase frequency to 500ms for faster feel
+}
+
+function handleMatch(user) {
+    // Debounce: don't log if we just logged this user recently (optional logic, but goodUX)
+    // For now simplistic: just show log and optional pause
+    
+    // Check if we just logged them
+    if (lastLog.value && lastLog.value.userId === user.id && (new Date() - new Date(lastLog.value.timestamp) < 5000)) {
+        return // Ignore repeated logs within 5 seconds
+    }
+
+    const log = {
+         userName: user.name,
+         userId: user.id,
+         timestamp: new Date().toISOString(),
+         type: 'ENTRADA' 
+    }
+       
+    StorageService.saveLog(log)
+    lastLog.value = log
+    
+    $q.notify({
+         color: 'positive',
+         message: `Bienvenido, ${user.name}!`,
+         icon: 'verified',
+         position: 'top',
+         timeout: 2000
+    })
 }
 </script>
+
+<style scoped>
+.fade-in-out {
+  animation: fadeIn 0.5s ease-in-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

@@ -22,10 +22,51 @@ export const StorageService = {
         localStorage.setItem(LOGS_KEY, JSON.stringify(logs));
     },
 
-    findUserByCredentialId(credentialId) {
+    findUserByFace(faceDescriptor) {
         const users = this.getUsers();
-        // Simplified matching: in real world, credentialId comparison needs base64 conversion handling
-        // We will store credentialId as base64url string
-        return users.find(u => u.credentialId === credentialId);
+        let bestMatch = null;
+        let minDistance = 0.6; // Threshold for face matching
+
+        users.forEach(user => {
+            if (user.faceDescriptor) {
+                // Euclidean distance calculation
+                const distance = Math.sqrt(
+                    user.faceDescriptor.reduce((sum, val, i) => sum + Math.pow(val - faceDescriptor[i], 2), 0)
+                );
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    bestMatch = user;
+                }
+            }
+        });
+
+        return bestMatch;
+    },
+
+    deleteUser(userId) {
+        let users = this.getUsers();
+        users = users.filter(u => u.id !== userId);
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    },
+
+    clearAllUsers() {
+        localStorage.removeItem(USERS_KEY);
+    },
+
+    // Check if face exists without returning full user, useful for boolean checks
+    isFaceRegistered(faceDescriptor) {
+        return !!this.findUserByFace(faceDescriptor);
+    },
+
+    // Logs mgmt
+    deleteLog(timestamp) {
+        let logs = this.getLogs();
+        logs = logs.filter(l => l.timestamp !== timestamp);
+        localStorage.setItem(LOGS_KEY, JSON.stringify(logs));
+    },
+
+    clearLogs() {
+        localStorage.removeItem(LOGS_KEY);
     }
 };
