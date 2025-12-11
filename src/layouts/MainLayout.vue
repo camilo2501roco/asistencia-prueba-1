@@ -29,7 +29,7 @@
           Menú
         </q-item-label>
 
-        <q-item clickable target="_blank" @click="currentView = 'attendance'">
+        <q-item clickable @click="currentView = 'attendance'">
           <q-item-section avatar>
             <q-icon name="fingerprint" />
           </q-item-section>
@@ -38,7 +38,7 @@
           </q-item-section>
         </q-item>
 
-        <q-item clickable target="_blank" @click="currentView = 'register'">
+        <q-item clickable @click="currentView = 'register'">
           <q-item-section avatar>
             <q-icon name="person_add" />
           </q-item-section>
@@ -47,7 +47,7 @@
           </q-item-section>
         </q-item>
         
-        <q-item clickable target="_blank" @click="currentView = 'logs'">
+        <q-item clickable @click="currentView = 'logs'">
           <q-item-section avatar>
             <q-icon name="list" />
           </q-item-section>

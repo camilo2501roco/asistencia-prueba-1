@@ -5,7 +5,7 @@
       <q-input v-model="name" label="Nombre Completo" outlined class="q-mb-md full-width" />
       <q-input v-model="userId" label="ID / Cédula" outlined class="q-mb-md full-width" />
       
-      <div class="relative-position q-mb-md" style="width: 100%; height: 300px; background: #000; border-radius: 8px; overflow: hidden;">
+      <div class="relative-position q-mb-md" style="width: 100%; aspect-ratio: 3/4; max-height: 60vh; background: #000; border-radius: 8px; overflow: hidden;">
         <video ref="video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
         <div v-if="!modelsLoaded" class="absolute-full flex flex-center bg-dark text-white" style="opacity: 0.8">
             <q-spinner size="3em" />

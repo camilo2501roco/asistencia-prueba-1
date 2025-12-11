@@ -1,12 +1,13 @@
 <template>
-  <div class="q-pa-md">
-    <div class="row q-col-gutter-md">
+  <div class="q-pa-sm q-pa-md-md">
+    <div class="row q-col-gutter-sm q-col-gutter-md-md">
       <!-- Calendar Section -->
-      <div class="col-12 col-md-4">
+      <div class="col-12 col-md-4 flex justify-center">
         <q-date
           v-model="selectedDate"
           mask="YYYY-MM-DD"
-          class="full-width"
+          class="full-width q-date-responsive"
+          style="max-width: 320px;"
           today-btn
         />
         <div class="q-mt-md text-center">
@@ -113,3 +114,13 @@ function confirmClearLogs() {
     })
 }
 </script>
+
+<style scoped>
+@media (max-width: 340px) {
+  .q-date-responsive {
+    transform: scale(0.85); /* Scale down for tiny screens */
+    transform-origin: top center;
+    margin-bottom: -40px; /* Adjust layout gap caused by scale */
+  }
+}
+</style>

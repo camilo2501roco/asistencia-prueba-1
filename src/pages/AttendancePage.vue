@@ -4,7 +4,7 @@
     
     <div class="column items-center q-gutter-y-lg" style="width: 100%; max-width: 500px">
       
-      <div class="relative-position" style="width: 100%; height: 350px; background: #000; border-radius: 8px; overflow: hidden;">
+      <div class="relative-position video-container" style="width: 100%; max-height: 80vh; aspect-ratio: 3/4; background: #000; border-radius: 8px; overflow: hidden;">
         <video ref="video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
         
         <div v-if="!modelsLoaded" class="absolute-full flex flex-center bg-dark text-white" style="opacity: 0.8">
@@ -17,7 +17,7 @@
         </div>
       </div>
       
-      <div class="text-h6 text-grey" v-if="!lastLog">Mira a la cámara para registrarte</div>
+      <div class="text-h6 text-grey text-center" v-if="!lastLog">Mira a la cámara para registrarte</div>
     </div>
 
     <!-- Last Log Display -->
