@@ -136,12 +136,10 @@ function startDetection() {
 }
 
 function handleMatch(user) {
-    // Debounce: don't log if we just logged this user recently (optional logic, but goodUX)
-    // For now simplistic: just show log and optional pause
-    
-    // Check if we just logged them
+  
+   
     if (lastLog.value && lastLog.value.userId === user.id && (new Date() - new Date(lastLog.value.timestamp) < 5000)) {
-        return // Ignore repeated logs within 5 seconds
+        return 
     }
 
     const log = {
