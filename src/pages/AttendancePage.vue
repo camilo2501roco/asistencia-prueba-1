@@ -62,8 +62,8 @@ async function loadModels() {
   try {
     const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models'
     await Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL), // Lighter model
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL), // Lighter landmarks
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
     ])
     modelsLoaded.value = true
@@ -75,7 +75,14 @@ async function loadModels() {
 
 async function startCamera() {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+    // Constraint resolution to VGA (640x480) for mobile performance
+    stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+            facingMode: 'user',
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+        } 
+    })
     if (video.value) {
       video.value.srcObject = stream
       // Start detection loop once video is playing
@@ -101,22 +108,23 @@ function stopCamera() {
 
 function startDetection() {
     scanning.value = true
+    const options = new faceapi.TinyFaceDetectorOptions() // Use Tiny options
+
     intervalId = setInterval(async () => {
         if (!video.value || isProcessing || !modelsLoaded.value) return
         
         isProcessing = true
         try {
-             // Use tinyFaceDetector for faster performance if needed, but SSD is more accurate
-             const detection = await faceapi.detectSingleFace(video.value).withFaceLandmarks().withFaceDescriptor()
+             // Use tinyFaceDetector for faster performance
+             const detection = await faceapi.detectSingleFace(video.value, options)
+                .withFaceLandmarks(true) // Use tiny landmarks
+                .withFaceDescriptor()
              
              if (detection) {
                  const bestMatch = StorageService.findUserByFace(Array.from(detection.descriptor))
                  
                  if (bestMatch) {
                      handleMatch(bestMatch)
-                 } else {
-                     // Detected but not recognized
-                     // Optional: Could show a "Rostro no reconocido" toast but it might spam
                  }
              }
         } catch (e) {
@@ -124,7 +132,7 @@ function startDetection() {
         } finally {
             isProcessing = false
         }
-    }, 500) // Increase frequency to 500ms for faster feel
+    }, 500)
 }
 
 function handleMatch(user) {

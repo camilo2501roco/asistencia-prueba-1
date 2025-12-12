@@ -83,8 +83,8 @@ async function loadModels() {
   try {
     const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models'
     await Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
     ])
     modelsLoaded.value = true
@@ -96,7 +96,13 @@ async function loadModels() {
 
 async function startCamera() {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+    stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+            facingMode: 'user',
+            width: { ideal: 640 },
+            height: { ideal: 480 } 
+        } 
+    })
     if (video.value) {
       video.value.srcObject = stream
     }
@@ -117,8 +123,11 @@ async function registerUser() {
   try {
     if (!video.value) return
 
+    // Use Tiny Face Detector Options
+    const options = new faceapi.TinyFaceDetectorOptions()
+    
     // Detect face
-    const detection = await faceapi.detectSingleFace(video.value).withFaceLandmarks().withFaceDescriptor()
+    const detection = await faceapi.detectSingleFace(video.value, options).withFaceLandmarks(true).withFaceDescriptor()
     
     if (!detection) {
       throw new Error("No se detectó ningún rostro. Asegúrate de estar frente a la cámara.")
@@ -141,7 +150,7 @@ async function registerUser() {
     StorageService.saveUser(user)
     refreshUsers()
     
-    $q.notify({ user: 'positive', message: 'Usuario registrado correctamente con rostro', icon: 'check' })
+    $q.notify({ type: 'positive', message: 'Usuario registrado correctamente con rostro', icon: 'check' })
     
     name.value = ''
     userId.value = ''
